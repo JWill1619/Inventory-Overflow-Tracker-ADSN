@@ -94,3 +94,7 @@ Existing free-text records remain visibly **Unlinked legacy item**. To reconcile
 The supplied export contains stock identities, not rack/shelf addresses. Stock codes help workers identify the matching shelf item; the app does not infer shelf locations.
 
 Catalog browser regression suite: `npx playwright test --config playwright.catalog.config.ts`. It uses an isolated temporary application checkout and PostgreSQL on ports 3002/55441, so it can run while the interactive preview is open. It uses synthetic products; the company CSV is never needed for tests.
+
+## Shelves trial
+
+The `codex/shelves-trial` branch adds a shelf replenishment page, direct-to-shelf delivery records, and reviewed pallet-to-shelf moves. It is an isolated experiment awaiting workflow confirmation, not a live shelf stock balance. See [the trial and rollback guide](docs/SHELVES-TRIAL.md). The stable Git checkpoint is `checkpoint-before-shelves`.

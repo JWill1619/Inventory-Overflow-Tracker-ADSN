@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LayoutGrid,
+  Rows3,
   Layers3,
   Plus,
   History,
@@ -20,12 +21,13 @@ import Brand from "./brand";
 import type { Snapshot } from "@/lib/types";
 import { normalize } from "@/lib/validation";
 
-type Page = "Overview" | "Create Pallet" | "Pallets" | "History";
+type Page = "Overview" | "Create Pallet" | "Pallets" | "Shelves" | "History";
 import { total, date, number } from "@/lib/display";
 import Stat from "./stat";
 import PalletForm from "./pallet-form";
 import PalletDetail from "./pallet-detail";
 import HistoryView from "./history-view";
+import ShelvesView from "./shelves-view";
 async function api(path: string, method = "GET", body?: unknown) {
   const r = await fetch(path, {
     method,
@@ -298,6 +300,7 @@ export default function Tracker() {
               { name: "Overview", icon: LayoutGrid },
               { name: "Create Pallet", icon: Plus },
               { name: "Pallets", icon: Layers3 },
+              { name: "Shelves", icon: Rows3 },
               { name: "History", icon: History },
             ] as const
           ).map(({ name, icon: Icon }) => (
@@ -367,6 +370,9 @@ export default function Tracker() {
           </span>
         </header>
         <main className="content">
+          <p className="trial-banner">
+            Shelves trial · Separate test workspace
+          </p>
           {offline && (
             <div className="warning" role="status">
               <WifiOff size={18} />
@@ -415,6 +421,13 @@ export default function Tracker() {
                 if (ok) navigate("Overview");
                 return ok;
               }}
+            />
+          ) : page === "Shelves" ? (
+            <ShelvesView
+              data={data!}
+              disabled={busy || offline}
+              submit={submit}
+              openPallet={(id) => setSelected(id)}
             />
           ) : page === "History" ? (
             <HistoryView data={data!} />

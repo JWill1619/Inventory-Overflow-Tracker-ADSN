@@ -21,7 +21,7 @@ export async function snapshot(token: string | undefined): Promise<Snapshot> {
     ).rows;
     const history = (
       await c.query(
-        `select m.*,r.name product,r.stock_code as "stockCode",s.pallet_identifier source,d.pallet_identifier destination from adsn.inventory_movements m left join adsn.products r on r.id=m.product_id left join adsn.pallets s on s.id=m.source_pallet_id left join adsn.pallets d on d.id=m.destination_pallet_id order by m.created_at desc,m.id`,
+        `select m.*,m.product_id as "productId",r.name product,r.stock_code as "stockCode",s.pallet_identifier source,d.pallet_identifier destination from adsn.inventory_movements m left join adsn.products r on r.id=m.product_id left join adsn.pallets s on s.id=m.source_pallet_id left join adsn.pallets d on d.id=m.destination_pallet_id order by m.created_at desc,m.id`,
       )
     ).rows;
     await c.query("commit");
@@ -71,7 +71,7 @@ async function product(
 export async function mutate(
   token: string | undefined,
   input: unknown,
-): Promise<{ palletId: string; message: string }> {
+): Promise<{ palletId: string | null; message: string }> {
   const v = mutationSchema.parse(input),
     c = await db().connect();
   try {
@@ -95,7 +95,7 @@ export async function mutate(
     const group = crypto.randomUUID();
     async function event(
       action: string,
-      pallet: string,
+      pallet: string | null,
       productId: string | null = null,
       quantity = 0,
       before: number | null = null,
@@ -150,15 +150,38 @@ export async function mutate(
           "This stock code appears twice. Combine its quantities into one row.",
         );
     }
-    let id: string;
-    if (v.action === "create") {
+    let id: string | null;
+    if (v.action === "shelfDelivery") {
+      const {
+        rows: [official],
+      } = await c.query(
+        "select id from adsn.products where id=$1 and stock_code is not null",
+        [v.productId],
+      );
+      if (!official)
+        throw new AppError(
+          400,
+          "Select an official stock-code item from the master list.",
+        );
+      id = null;
+      await event(
+        "SHELF_DELIVERY",
+        null,
+        official.id,
+        v.quantity,
+        null,
+        null,
+        null,
+        v.reference,
+      );
+    } else if (v.action === "create") {
       const {
         rows: [p],
       } = await c.query(
         "insert into adsn.pallets(pallet_identifier,status,activated_at) values($1,$2,case when $2='ACTIVE' then now() end) returning id",
         [v.identifier, v.draft ? "DRAFT" : "ACTIVE"],
       );
-      id = p.id;
+      id = p.id as string;
       await event("PALLET_CREATED", id);
       for (const l of v.lines) {
         const pid = await product(c, l.name, l.brand, l.productId);
@@ -422,7 +445,12 @@ export async function mutate(
     }
     const response = {
       palletId: id,
-      message: "Inventory updated successfully.",
+      message:
+        v.action === "shelfDelivery"
+          ? "Direct-to-shelf delivery recorded."
+          : v.action === "take"
+            ? "Stock moved to shelves and recorded."
+            : "Inventory updated successfully.",
     };
     await c.query(
       "insert into adsn.requests(idempotency_key,payload_hash,response) values($1,$2,$3)",

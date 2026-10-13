@@ -57,7 +57,7 @@ if (process.env.E2E_CATALOG === "true") {
 }
 await c.end();
 let webDir = process.cwd();
-if (process.env.E2E_CATALOG === "true") {
+if (process.env.E2E_CATALOG === "true" || process.env.E2E_ISOLATED === "true") {
   webDir = await mkdtemp(`${tmpdir()}/adsn-web-`);
   for (const entry of [
     "app",

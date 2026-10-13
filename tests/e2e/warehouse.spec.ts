@@ -6,7 +6,7 @@ test("server rejects unauthenticated reads, writes, and forged origins", async (
   expect(
     (
       await request.post("/api/inventory", {
-        headers: { origin: "http://127.0.0.1:3001", "x-adsn-request": "1" },
+        headers: { origin: "http://127.0.0.1:3004", "x-adsn-request": "1" },
         data: {},
       })
     ).status(),
@@ -56,10 +56,15 @@ test("warehouse worker creates, finds, replenishes, corrects and merges real sto
   ).toBeVisible();
   await page.getByRole("button", { name: `Open E2E source ${suffix}` }).click();
   await page
-    .getByRole("button", { name: "Take from overflow", exact: true })
+    .getByRole("button", { name: "Move to shelves", exact: true })
     .click();
-  await page.getByLabel("Quantity taken").fill("6");
-  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await page.getByLabel("Units to put onto shelves").fill("6");
+  await page
+    .getByRole("button", { name: "Review change", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Confirm change", exact: true })
+    .click();
   await expect(
     page.getByText("4 units · 1 products", { exact: false }),
   ).toBeVisible();
@@ -196,7 +201,7 @@ test("draft editing, product autocomplete, added stock and second-device sync", 
   const other = await browser.newContext();
   const second = await other.newPage();
   try {
-    await second.goto("http://127.0.0.1:3001");
+    await second.goto("http://127.0.0.1:3004");
     await second
       .getByLabel("Company password")
       .fill("Browser test password only 937!");

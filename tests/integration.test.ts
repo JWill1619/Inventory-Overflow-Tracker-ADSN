@@ -21,7 +21,7 @@ const create = (name: string, quantities = [10, 12, 3], draft = false) =>
       quantity,
     })),
   });
-async function pallet(id: string) {
+async function pallet(id: string | null) {
   return (await snapshot(token)).pallets.find((p) => p.id === id)!;
 }
 beforeAll(async () => {
@@ -421,4 +421,120 @@ it("imports official codes without changing stock, preserves identities, and enf
   expect(linkedEvents[0].movement_group_id).toBe(
     linkedEvents[1].movement_group_id,
   );
+});
+
+it("records direct shelf deliveries once, validates codes, and preserves overflow", async () => {
+  const before = await snapshot(token);
+  const official = before.products.find((p) => p.stockCode === "00123")!;
+  const payload = {
+    action: "shelfDelivery",
+    key: crypto.randomUUID(),
+    productId: official.id,
+    quantity: 12,
+    reference: "Delivery DN-100",
+  };
+  await expect(mutate(undefined, payload)).rejects.toMatchObject({
+    status: 401,
+  });
+  const [a, b] = await Promise.all([
+    mutate(token, payload),
+    mutate(token, payload),
+  ]);
+  expect(a).toEqual(b);
+  expect(a.palletId).toBeNull();
+  const after = await snapshot(token);
+  expect(after.pallets).toEqual(before.pallets);
+  expect(
+    after.history.filter((m) => m.action_type === "SHELF_DELIVERY"),
+  ).toEqual([
+    expect.objectContaining({
+      productId: official.id,
+      quantity: 12,
+      source: null,
+      quantity_before: null,
+      quantity_after: null,
+      notes: "Delivery DN-100",
+    }),
+  ]);
+  await expect(
+    mutate(token, { ...payload, quantity: 13 }),
+  ).rejects.toMatchObject({ status: 409 });
+  await expect(
+    mutate(token, {
+      ...payload,
+      key: crypto.randomUUID(),
+      productId: before.products.find((p) => !p.stockCode)!.id,
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    mutate(token, { ...payload, key: crypto.randomUUID(), quantity: 1.5 }),
+  ).rejects.toThrow();
+  await expect(
+    mutate(token, { ...payload, key: crypto.randomUUID(), reference: " " }),
+  ).rejects.toThrow();
+  expect(
+    (await snapshot(token)).history.filter(
+      (m) => m.action_type === "SHELF_DELIVERY",
+    ),
+  ).toHaveLength(1);
+});
+
+it("logs shelf moves atomically, rejects stale/overdrawn moves, and closes empty pallets", async () => {
+  const official = (await snapshot(token)).products.find(
+    (p) => p.stockCode === "00124",
+  )!;
+  const created = await mutate(token, {
+    action: "create",
+    key: crypto.randomUUID(),
+    identifier: "Shelf move safety",
+    draft: false,
+    lines: [{ productId: official.id, name: official.name, quantity: 10 }],
+  });
+  const payload = {
+    action: "take",
+    key: crypto.randomUUID(),
+    palletId: created.palletId,
+    productId: official.id,
+    version: 1,
+    quantity: 6,
+  };
+  await Promise.all([mutate(token, payload), mutate(token, payload)]);
+  expect((await pallet(created.palletId)).items[0].quantity).toBe(4);
+  await expect(
+    mutate(token, { ...payload, key: crypto.randomUUID() }),
+  ).rejects.toMatchObject({ status: 409 });
+  await expect(
+    mutate(token, {
+      ...payload,
+      key: crypto.randomUUID(),
+      version: 2,
+      quantity: 5,
+    }),
+  ).rejects.toMatchObject({ status: 409 });
+  expect(
+    (await snapshot(token)).history.filter(
+      (m) =>
+        m.action_type === "STOCK_REPLENISHED" &&
+        m.source === "Shelf move safety",
+    ),
+  ).toHaveLength(1);
+  await mutate(token, {
+    ...payload,
+    key: crypto.randomUUID(),
+    version: 2,
+    quantity: 4,
+  });
+  const after = await snapshot(token);
+  expect((await pallet(created.palletId)).status).toBe("EMPTY");
+  const moved = after.history.filter(
+    (m) =>
+      m.action_type === "STOCK_REPLENISHED" && m.source === "Shelf move safety",
+  );
+  expect(moved.reduce((n, m) => n + m.quantity, 0)).toBe(10);
+  expect(moved.every((m) => m.productId === official.id)).toBe(true);
+  await expect(
+    db().query(
+      "update adsn.inventory_movements set quantity=1 where action_type='SHELF_DELIVERY'",
+    ),
+  ).rejects.toMatchObject({ code: "42501" });
 });

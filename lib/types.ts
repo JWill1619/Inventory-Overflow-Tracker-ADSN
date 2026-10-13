@@ -21,6 +21,7 @@ export type Product = {
   stockCode?: string | null;
 };
 export type Movement = {
+  productId: string | null;
   id: string;
   action_type: string;
   product: string | null;

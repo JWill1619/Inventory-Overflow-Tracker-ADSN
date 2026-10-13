@@ -31,6 +31,13 @@ const base = { key: z.uuid() };
 export const mutationSchema = z.discriminatedUnion("action", [
   z.object({
     ...base,
+    action: z.literal("shelfDelivery"),
+    productId: z.uuid(),
+    quantity: qty,
+    reference: z.string().trim().min(1).max(160),
+  }),
+  z.object({
+    ...base,
     action: z.literal("link"),
     palletId: z.uuid(),
     productId: z.uuid(),

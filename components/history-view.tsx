@@ -46,6 +46,7 @@ export default function HistoryView({ data }: { data: Snapshot }) {
                 "PALLET_ACTIVATED",
                 "STOCK_ADDED",
                 "STOCK_REPLENISHED",
+                "SHELF_DELIVERY",
                 "STOCK_ADJUSTED",
                 "STOCK_TRANSFERRED",
                 "PALLET_CLOSED",
@@ -94,7 +95,10 @@ export default function HistoryView({ data }: { data: Snapshot }) {
                 <p>
                   {m.stockCode && `${m.stockCode} · `}
                   {m.product ?? m.source}
-                  {m.product && ` · ${m.source}`}
+                  {m.product && ` · ${m.source ?? "Direct delivery"}`}
+                  {["STOCK_REPLENISHED", "SHELF_DELIVERY"].includes(
+                    m.action_type,
+                  ) && " → Shelves"}
                   {m.destination && ` → ${m.destination}`}
                 </p>
                 {m.notes && <p className="small">{m.notes}</p>}

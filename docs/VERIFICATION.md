@@ -26,3 +26,13 @@ Follow-up fixes: unused blank product rows are ignored, whole-number decimal not
 Stock-code update: the supplied 788-row directory was imported into the local preview with its 307-unit balance unchanged. Source data stays in ignored local storage. Database tests now cover leading-zero codes, quoted CSV commas, duplicate import rejection, idempotent reimport, distinct codes sharing descriptions, official identity enforcement, unified 10+24 unit totals, and audited legacy identity matching without changing total stock.
 
 Current stock-code verification: 38 unit/database tests and four dedicated desktop/mobile browser scenarios passed. The browser scenarios verify official code selection, combined totals, rejection of unselected text, and explicit legacy matching with unchanged pallet units. Lint, strict TypeScript, production build and the client static bundle check also passed.
+
+## Isolated Shelves trial
+
+The verified story is: select an official stock item → review a pallet-to-shelf movement or direct delivery → authenticated API → atomic immutable movement → searchable shelf totals beside current overflow. The original preview database is not migrated.
+
+- 42 unit/real-PostgreSQL tests passed, including shelf grouping by code, UTC date boundaries, draft exclusion, direct-delivery validation, retry deduplication, stale/overdrawn movement rejection, empty-pallet closure, and immutable history permissions.
+- Six catalog/shelves browser scenarios passed on desktop and mobile. Shelf scenarios exercise review before mutation, pallet deduction, direct delivery with unchanged overflow, date filters, persistent API records, offline controls, no browser exceptions, and no horizontal overflow.
+- Production build (webpack), TypeScript, ESLint and client secret-marker scan passed. Desktop and mobile shelf screenshots were inspected.
+- The trial was restored from a consistent private snapshot. Original and trial products, pallets, items, movements and idempotency requests matched before interactive testing. See [SHELVES-TRIAL.md](SHELVES-TRIAL.md) for recovery paths and limitations.
+- All nine existing warehouse browser scenarios passed again across desktop, tablet and mobile, including the newly reviewed shelf-movement step, corrections, merges, draft editing and cross-device updates.
