@@ -1,0 +1,25 @@
+[Unit]
+Description=ADSN Solutions Overflow Pallet Tracker
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=adsn
+Group=adsn
+WorkingDirectory=/opt/adsn-overflow
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/adsn-overflow.env
+# npm start binds 127.0.0.1. Tailscale Serve is the only ingress.
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/adsn-overflow/.next
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
