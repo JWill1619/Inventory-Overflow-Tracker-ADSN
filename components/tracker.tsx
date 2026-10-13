@@ -237,7 +237,15 @@ export default function Tracker() {
           match(p.name) ||
           match(p.brand) ||
           p.locations.some((l) => match(l.pallet.pallet_identifier))),
-    );
+    )
+    .sort((a, b) => {
+      if (!a.stockCode) return b.stockCode ? 1 : a.name.localeCompare(b.name);
+      if (!b.stockCode) return -1;
+      return (
+        a.stockCode.localeCompare(b.stockCode, "en-GB", { numeric: true }) ||
+        a.name.localeCompare(b.name)
+      );
+    });
   const nextName = () => {
     let n = 1;
     while (
@@ -579,8 +587,8 @@ export default function Tracker() {
                   >
                     <table className="product-table">
                       <caption>
-                        Current overflow by product. Quantities are combined
-                        across active pallets.
+                        Stock codes from lowest to highest. Quantities are
+                        combined across active pallets.
                       </caption>
                       <thead>
                         <tr>
