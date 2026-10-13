@@ -56,15 +56,10 @@ test("warehouse worker creates, finds, replenishes, corrects and merges real sto
   ).toBeVisible();
   await page.getByRole("button", { name: `Open E2E source ${suffix}` }).click();
   await page
-    .getByRole("button", { name: "Move to shelves", exact: true })
+    .getByRole("button", { name: "Take from overflow", exact: true })
     .click();
-  await page.getByLabel("Units to put onto shelves").fill("6");
-  await page
-    .getByRole("button", { name: "Review change", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Confirm change", exact: true })
-    .click();
+  await page.getByLabel("Quantity taken").fill("6");
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(
     page.getByText("4 units · 1 products", { exact: false }),
   ).toBeVisible();

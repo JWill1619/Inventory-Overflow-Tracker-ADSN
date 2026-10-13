@@ -1,5 +1,7 @@
 # Shelves trial and rollback
 
+**Archived experiment:** the manager confirmed that shelf tracking is not required. The current preview has no Shelves screen; All products now shows an overflow table. The following documents the earlier experiment and its retained recovery setup, not the current UI. Historical records and backups have not been deleted.
+
 The stable checkpoint is Git tag `checkpoint-before-shelves`, commit `e124c06`, pushed to GitHub. It includes the product/quantity alignment fix. The original checkout stays on `main`. Shelves work lives on `codex/shelves-trial` in a separate managed worktree.
 
 ## Try the workflow

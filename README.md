@@ -95,6 +95,6 @@ The supplied export contains stock identities, not rack/shelf addresses. Stock c
 
 Catalog browser regression suite: `npx playwright test --config playwright.catalog.config.ts`. It uses an isolated temporary application checkout and PostgreSQL on ports 3002/55441, so it can run while the interactive preview is open. It uses synthetic products; the company CSV is never needed for tests.
 
-## Shelves trial
+## Product table preview
 
-The `codex/shelves-trial` branch adds a shelf replenishment page, direct-to-shelf delivery records, and reviewed pallet-to-shelf moves. It is an isolated experiment awaiting workflow confirmation, not a live shelf stock balance. See [the trial and rollback guide](docs/SHELVES-TRIAL.md). The stable Git checkpoint is `checkpoint-before-shelves`.
+The current preview replaces All products cards with a spreadsheet-style table: stock code, product name, combined overflow units, and clickable pallet locations with per-pallet quantities. All pallets keeps its existing card view. The Shelves experiment has been removed from navigation and product results after workflow clarification; historical trial records are retained. The preview still uses its separate database at http://localhost:3003. The original rollback checkpoint remains `checkpoint-before-shelves`; see [the archived trial and rollback guide](docs/SHELVES-TRIAL.md).

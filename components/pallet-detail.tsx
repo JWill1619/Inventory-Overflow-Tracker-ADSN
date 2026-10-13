@@ -59,10 +59,7 @@ export default function PalletDetail({
   async function run(e: React.FormEvent) {
     e.preventDefault();
     if (
-      (mode === "take" ||
-        mode === "correct" ||
-        mode === "transfer" ||
-        mode === "link") &&
+      (mode === "correct" || mode === "transfer" || mode === "link") &&
       !confirm
     ) {
       setConfirm(true);
@@ -203,7 +200,7 @@ export default function PalletDetail({
                   disabled={disabled}
                   onClick={() => begin("take", i)}
                 >
-                  Move to shelves
+                  Take from overflow
                 </button>
                 <button
                   className="quiet"
@@ -238,7 +235,7 @@ export default function PalletDetail({
               <h2 id="operation-heading" ref={operationHeading} tabIndex={-1}>
                 {
                   {
-                    take: "Move to shelves",
+                    take: "Take from overflow",
                     add: "Add stock",
                     correct: "Correct balance",
                     transfer: "Move / merge stock",
@@ -420,7 +417,7 @@ export default function PalletDetail({
                   {mode === "correct"
                     ? "Actual physically counted units"
                     : mode === "take"
-                      ? "Units to put onto shelves"
+                      ? "Quantity taken"
                       : "Additional units"}
                   <input
                     autoFocus
@@ -440,15 +437,6 @@ export default function PalletDetail({
                     onChange={(e) => setQuantity(e.target.value)}
                   />
                 </label>
-                {mode === "take" && (
-                  <p className={confirm ? "warning" : "small"}>
-                    {confirm
-                      ? `Confirm moving ${quantity} units from ${p.pallet_identifier} to shelves. `
-                      : ""}
-                    This reduces overflow and records the same quantity on the
-                    Shelves page. Sales are tracked separately.
-                  </p>
-                )}
                 {mode === "correct" && (
                   <>
                     <label>
@@ -495,10 +483,7 @@ export default function PalletDetail({
                 ? "Saving…"
                 : confirm
                   ? "Confirm change"
-                  : mode === "take" ||
-                      mode === "transfer" ||
-                      mode === "correct" ||
-                      mode === "link"
+                  : mode === "transfer" || mode === "correct" || mode === "link"
                     ? "Review change"
                     : "Confirm"}
               <Check size={18} />

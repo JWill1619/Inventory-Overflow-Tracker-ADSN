@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   LayoutGrid,
-  Rows3,
   Layers3,
   Plus,
   History,
@@ -21,14 +20,12 @@ import Brand from "./brand";
 import type { Snapshot } from "@/lib/types";
 import { normalize } from "@/lib/validation";
 
-type Page = "Overview" | "Create Pallet" | "Pallets" | "Shelves" | "History";
+type Page = "Overview" | "Create Pallet" | "Pallets" | "History";
 import { total, date, number } from "@/lib/display";
 import Stat from "./stat";
 import PalletForm from "./pallet-form";
 import PalletDetail from "./pallet-detail";
 import HistoryView from "./history-view";
-import ShelvesView from "./shelves-view";
-import { shelfReport } from "@/lib/shelves";
 async function api(path: string, method = "GET", body?: unknown) {
   const r = await fetch(path, {
     method,
@@ -58,16 +55,6 @@ export default function Tracker() {
     [offline, setOffline] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [shelfFrom, setShelfFrom] = useState("");
-  const [shelfTo, setShelfTo] = useState("");
-  const [shelfFilters, setShelfFilters] = useState({
-    query: "",
-    from: "",
-    to: "",
-  });
-  const invalidShelfDates = Boolean(
-    shelfFrom && shelfTo && shelfFrom > shelfTo,
-  );
   const retry = useRef<{ serialized: string; key: string } | null>(null);
   const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
@@ -134,7 +121,6 @@ export default function Tracker() {
   }
   const navigate = (p: Page) => {
     setPage(p);
-    setShelfFilters({ query: "", from: "", to: "" });
     setSelected(null);
     setQuery("");
     setError("");
@@ -234,15 +220,24 @@ export default function Tracker() {
             ? b.created_at.localeCompare(a.created_at)
             : b.updated_at.localeCompare(a.updated_at),
     );
-  const groups = (
-    data ? shelfReport(data, "", shelfFrom, shelfTo).products : []
-  ).filter(
-    (p) =>
-      match(p.stockCode ?? "") ||
-      match(p.name) ||
-      match(p.brand) ||
-      p.locations.some((l) => match(l.name)),
-  );
+  const groups = products
+    .map((p) => ({
+      ...p,
+      locations: active
+        .filter((a) => a.items.some((i) => i.productId === p.id))
+        .map((a) => ({
+          pallet: a,
+          quantity: a.items.find((i) => i.productId === p.id)!.quantity,
+        })),
+    }))
+    .filter(
+      (p) =>
+        p.locations.length &&
+        (match(p.stockCode ?? "") ||
+          match(p.name) ||
+          match(p.brand) ||
+          p.locations.some((l) => match(l.pallet.pallet_identifier))),
+    );
   const nextName = () => {
     let n = 1;
     while (
@@ -303,7 +298,6 @@ export default function Tracker() {
               { name: "Overview", icon: LayoutGrid },
               { name: "Create Pallet", icon: Plus },
               { name: "Pallets", icon: Layers3 },
-              { name: "Shelves", icon: Rows3 },
               { name: "History", icon: History },
             ] as const
           ).map(({ name, icon: Icon }) => (
@@ -373,9 +367,6 @@ export default function Tracker() {
           </span>
         </header>
         <main className="content">
-          <p className="trial-banner">
-            Shelves trial · Separate test workspace
-          </p>
           {offline && (
             <div className="warning" role="status">
               <WifiOff size={18} />
@@ -424,14 +415,6 @@ export default function Tracker() {
                 if (ok) navigate("Overview");
                 return ok;
               }}
-            />
-          ) : page === "Shelves" ? (
-            <ShelvesView
-              initialFilters={shelfFilters}
-              data={data!}
-              disabled={busy || offline}
-              submit={submit}
-              openPallet={(id) => setSelected(id)}
             />
           ) : page === "History" ? (
             <HistoryView data={data!} />
@@ -491,9 +474,7 @@ export default function Tracker() {
                   <div>
                     <h2>
                       {page === "Overview"
-                        ? view === "products"
-                          ? "Products: overflow & shelves"
-                          : "Your overflow stock"
+                        ? "Your overflow stock"
                         : "Pallet directory"}
                     </h2>
                     <p>A little more space. A lot more clarity.</p>
@@ -504,9 +485,7 @@ export default function Tracker() {
                     onClick={() => void exportData()}
                   >
                     <Download size={16} />
-                    {view === "products" && page === "Overview"
-                      ? "Export overflow"
-                      : "Export"}
+                    Export
                   </button>
                 </div>
                 <div className="toolbar">
@@ -572,49 +551,6 @@ export default function Tracker() {
                     )}
                   </div>
                 </div>
-                {page === "Overview" && view === "products" && (
-                  <div className="overview-shelf-filters">
-                    <p>
-                      Compare current overflow with units put onto shelves.
-                      Shelf figures are replenishment history; sales are not
-                      deducted, so these are not a warehouse stock total.
-                    </p>
-                    <div>
-                      <label>
-                        Shelf entries from (UTC)
-                        <input
-                          type="date"
-                          value={shelfFrom}
-                          max={shelfTo || undefined}
-                          onChange={(e) => setShelfFrom(e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Shelf entries to (UTC)
-                        <input
-                          type="date"
-                          value={shelfTo}
-                          min={shelfFrom || undefined}
-                          onChange={(e) => setShelfTo(e.target.value)}
-                        />
-                      </label>
-                      <button
-                        className="quiet"
-                        onClick={() => {
-                          setShelfFrom("");
-                          setShelfTo("");
-                        }}
-                      >
-                        All dates
-                      </button>
-                    </div>
-                    {invalidShelfDates && (
-                      <p className="error" role="alert">
-                        The end date must be on or after the start date.
-                      </p>
-                    )}
-                  </div>
-                )}
                 <div className="result-line">
                   <span>
                     {page === "Overview" && view === "products"
@@ -626,87 +562,73 @@ export default function Tracker() {
                     {query
                       ? ` matching “${query}”`
                       : page === "Overview"
-                        ? view === "products"
-                          ? " with overflow or shelf records"
-                          : " in active overflow"
+                        ? " in active overflow"
                         : ""}
                   </span>
                   <span>
                     <i className="tiny-dot" />
-                    {page === "Overview" && view === "products"
-                      ? "Overflow now · Shelf history"
-                      : "Confirmed stock only"}
+                    Confirmed stock only
                   </span>
                 </div>
                 {page === "Overview" && view === "products" ? (
-                  <div className="product-grid">
-                    {(!invalidShelfDates ? groups : []).map((p) => (
-                      <article className="product-card" key={p.id}>
-                        <div className="eyebrow">{p.brand || "STOCK ITEM"}</div>
-                        <h3>
-                          {p.name}
-                          {normalize(query) === normalize(p.name) && (
-                            <span className="badge">Exact match</span>
-                          )}
-                        </h3>
-                        <p className="stock-code">
-                          {p.stockCode
-                            ? `Stock code: ${p.stockCode}`
-                            : "Unlinked legacy item"}
-                        </p>
-                        <dl className="overview-product-figures">
-                          <div>
-                            <dt>In overflow now</dt>
-                            <dd>{number(p.overflow)}</dd>
-                            <small>Units on active pallets</small>
-                          </div>
-                          <div>
-                            <dt>Put onto shelves</dt>
-                            <dd>{number(p.fromPallets + p.direct)}</dd>
-                            <small>
-                              {shelfFrom || shelfTo
-                                ? "Selected date range"
-                                : "All recorded dates"}
-                            </small>
-                          </div>
-                        </dl>
-                        <p className="small">
-                          Shelved: {number(p.fromPallets)} from pallets ·{" "}
-                          {number(p.direct)} direct delivery
-                        </p>
-                        {!p.locations.length && (
-                          <p className="small">
-                            No units currently in overflow.
-                          </p>
-                        )}
-                        {p.locations.map((l) => (
-                          <button
-                            key={l.palletId}
-                            onClick={() => setSelected(l.palletId)}
-                            className="location"
-                          >
-                            {l.name}
-                            <span>
-                              {number(l.quantity)} units{" "}
-                              <ArrowUpRight size={15} />
-                            </span>
-                          </button>
+                  <div
+                    className="product-table-scroll"
+                    role="region"
+                    aria-label="All products table"
+                    tabIndex={0}
+                  >
+                    <table className="product-table">
+                      <caption>
+                        Current overflow by product. Quantities are combined
+                        across active pallets.
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Stock code</th>
+                          <th scope="col">Product name</th>
+                          <th scope="col" className="units-column">
+                            Overflow units
+                          </th>
+                          <th scope="col">Pallet locations</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groups.map((p) => (
+                          <tr key={p.id}>
+                            <td className="code-column">
+                              {p.stockCode ?? "Unlinked"}
+                            </td>
+                            <th scope="row">
+                              {p.name}
+                              {p.brand && (
+                                <span className="product-brand">{p.brand}</span>
+                              )}
+                            </th>
+                            <td className="units-column">
+                              {number(
+                                p.locations.reduce(
+                                  (sum, l) => sum + l.quantity,
+                                  0,
+                                ),
+                              )}
+                            </td>
+                            <td>
+                              <div className="product-pallet-links">
+                                {p.locations.map((l) => (
+                                  <button
+                                    key={l.pallet.id}
+                                    onClick={() => setSelected(l.pallet.id)}
+                                  >
+                                    {l.pallet.pallet_identifier}{" "}
+                                    <span>({number(l.quantity)} units)</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
                         ))}
-                        <button
-                          className="quiet shelf-history-link"
-                          onClick={() => {
-                            navigate("Shelves");
-                            setShelfFilters({
-                              query: p.stockCode ?? p.name,
-                              from: shelfFrom,
-                              to: shelfTo,
-                            });
-                          }}
-                        >
-                          View shelf history <ArrowUpRight size={15} />
-                        </button>
-                      </article>
-                    ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="pallet-grid">

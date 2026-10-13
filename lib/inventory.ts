@@ -449,7 +449,7 @@ export async function mutate(
         v.action === "shelfDelivery"
           ? "Direct-to-shelf delivery recorded."
           : v.action === "take"
-            ? "Stock moved to shelves and recorded."
+            ? "Inventory updated successfully."
             : "Inventory updated successfully.",
     };
     await c.query(

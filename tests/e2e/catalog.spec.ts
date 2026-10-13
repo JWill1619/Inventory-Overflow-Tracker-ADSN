@@ -49,19 +49,32 @@ test("selects stock codes and combines official totals across pallets", async ({
   }
   await page.getByRole("button", { name: "All products", exact: true }).click();
   await page.getByLabel("Search overflow").fill("00123");
-  const product = page.getByRole("article").filter({
-    has: page.getByRole("heading", {
-      name: "Official shampoo 1L",
+  const product = page
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell", { name: "00123", exact: true }) });
+  await expect(product).toHaveCount(1);
+  await expect(product.getByRole("rowheader")).toHaveText(
+    "Official shampoo 1L",
+  );
+  await expect(product.locator(".units-column")).toHaveText(
+    String(initialUnits + 34),
+  );
+  await expect(
+    product.getByRole("button", {
+      name: `Directory ${info.project.name} 0 (10 units)`,
       exact: true,
     }),
-  });
-  await expect(product).toHaveCount(1);
-  await expect(
-    product.locator(".overview-product-figures dd").first(),
-  ).toHaveText(String(initialUnits + 34));
-  await expect(
-    product.getByText("Stock code: 00123", { exact: true }),
   ).toBeVisible();
+  await expect(
+    product.getByRole("button", {
+      name: `Directory ${info.project.name} 1 (24 units)`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Shelves", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".product-card")).toHaveCount(0);
   await page.screenshot({
     path: `test-results/catalog-${info.project.name}.png`,
     fullPage: true,
@@ -71,6 +84,23 @@ test("selects stock codes and combines official totals across pallets", async ({
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await product
+    .getByRole("button", {
+      name: `Directory ${info.project.name} 0 (10 units)`,
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: `Directory ${info.project.name} 0`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await page.getByLabel("Search overflow").fill("No matching product XYZ");
+  await expect(
+    page.getByRole("heading", { name: "No matching stock" }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Create Pallet", exact: true })
     .click();
