@@ -15,12 +15,14 @@ import {
   Download,
   WifiOff,
   ChevronRight,
+  KeyRound,
 } from "lucide-react";
 import Brand from "./brand";
 import type { Snapshot } from "@/lib/types";
 import { normalize } from "@/lib/validation";
 
-type Page = "Overview" | "Create Pallet" | "Pallets" | "History";
+type Page =
+  "Overview" | "Create Pallet" | "Pallets" | "History" | "Change password";
 import { total, date, number } from "@/lib/display";
 import Stat from "./stat";
 import PalletForm from "./pallet-form";
@@ -55,6 +57,9 @@ export default function Tracker() {
     [offline, setOffline] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const retry = useRef<{ serialized: string; key: string } | null>(null);
   const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
@@ -120,6 +125,9 @@ export default function Tracker() {
     }
   }
   const navigate = (p: Page) => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmation("");
     setPage(p);
     setSelected(null);
     setQuery("");
@@ -134,6 +142,35 @@ export default function Tracker() {
       await api("/api/session", "POST", { password });
       setPassword("");
       await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function updatePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (newPassword !== confirmation) {
+      setError("The new passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api("/api/password", "POST", {
+        currentPassword,
+        newPassword,
+        confirmation,
+      });
+      refreshSequence.current++;
+      setAuth(false);
+      setData(null);
+      setPassword("");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmation("");
+      setPage("Overview");
+      setNotice(result.message);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -162,6 +199,11 @@ export default function Tracker() {
           <div className="login-rule" />
           <h2>Company sign in</h2>
           <p className="small">Use your ADSN Solutions company password.</p>
+          {notice && (
+            <p className="success" role="status">
+              {notice}
+            </p>
+          )}
           <form onSubmit={signIn}>
             <label htmlFor="password">Company password</label>
             <input
@@ -307,6 +349,7 @@ export default function Tracker() {
               { name: "Create Pallet", icon: Plus },
               { name: "Pallets", icon: Layers3 },
               { name: "History", icon: History },
+              { name: "Change password", icon: KeyRound },
             ] as const
           ).map(({ name, icon: Icon }) => (
             <button
@@ -424,6 +467,75 @@ export default function Tracker() {
                 return ok;
               }}
             />
+          ) : page === "Change password" ? (
+            <section className="board" style={{ maxWidth: 640, padding: 24 }}>
+              <h1>Change company password</h1>
+              <p>
+                This password is shared by everyone. Anyone who knows it can
+                change it. All devices will be signed out after a change.
+              </p>
+              <form
+                onSubmit={updatePassword}
+                style={{ display: "grid", gap: 12, marginTop: 24 }}
+              >
+                <label htmlFor="current-company-password">
+                  Current password
+                </label>
+                <input
+                  id="current-company-password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  maxLength={256}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  disabled={busy}
+                />
+                <label htmlFor="new-company-password">New password</label>
+                <input
+                  id="new-company-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={16}
+                  maxLength={256}
+                  aria-describedby="password-guidance"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={busy}
+                />
+                <p id="password-guidance" className="small">
+                  Use 16–256 characters with at least 8 different characters. A
+                  memorable company phrase works well. Save it somewhere safe
+                  before continuing.
+                </p>
+                <label htmlFor="confirm-company-password">
+                  Confirm new password
+                </label>
+                <input
+                  id="confirm-company-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={16}
+                  maxLength={256}
+                  value={confirmation}
+                  onChange={(e) => setConfirmation(e.target.value)}
+                  disabled={busy}
+                />
+                <button className="primary" disabled={busy || offline}>
+                  {busy ? "Changing password…" : "Change password and sign out"}
+                </button>
+                <button
+                  type="button"
+                  className="quiet"
+                  disabled={busy}
+                  onClick={() => navigate("Overview")}
+                >
+                  Cancel
+                </button>
+              </form>
+            </section>
           ) : page === "History" ? (
             <HistoryView data={data!} />
           ) : (

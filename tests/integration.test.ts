@@ -5,7 +5,13 @@ import { readdir, readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import argon2 from "argon2";
 import { mutate, snapshot } from "../lib/inventory";
-import { authenticate, csrf, login, digest } from "../lib/security";
+import {
+  authenticate,
+  csrf,
+  login,
+  digest,
+  changePassword,
+} from "../lib/security";
 import { db } from "../lib/db";
 let pg: EmbeddedPostgres, admin: Client, token: string, dir: string;
 const password = "Test-only warehouse password 83729!";
@@ -537,4 +543,35 @@ it("logs shelf moves atomically, rejects stale/overdrawn moves, and closes empty
       "update adsn.inventory_movements set quantity=1 where action_type='SHELF_DELIVERY'",
     ),
   ).rejects.toMatchObject({ code: "42501" });
+});
+
+it("changes the shared password only with a valid session and current password, revoking every session", async () => {
+  const replacement = "Changed warehouse phrase 93826!";
+  await expect(
+    changePassword(token, password, replacement, replacement),
+  ).rejects.toMatchObject({ status: 429 });
+  await admin.query(
+    "update adsn.login_control set failures=0,locked_until=null,window_started=now() where id=1",
+  );
+  await expect(
+    changePassword(undefined, password, replacement, replacement),
+  ).rejects.toMatchObject({ status: 401 });
+  await expect(
+    changePassword(token, password, "short", "short"),
+  ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    changePassword(token, password, replacement, "mismatch"),
+  ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    changePassword(token, "wrong", replacement, replacement),
+  ).rejects.toMatchObject({ status: 401 });
+  await authenticate(token);
+  const other = await login(password);
+  await changePassword(token, password, replacement, replacement);
+  await expect(authenticate(token)).rejects.toMatchObject({ status: 401 });
+  await expect(authenticate(other)).rejects.toMatchObject({ status: 401 });
+  await expect(login(password)).rejects.toMatchObject({ status: 401 });
+  token = await login(replacement);
+  await changePassword(token, replacement, password, password);
+  token = await login(password);
 });

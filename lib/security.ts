@@ -32,11 +32,44 @@ export async function authenticate(
   return result.rows[0].id as string;
 }
 export async function login(password: string, previous?: string) {
+  return verifyCredential(password, previous);
+}
+export async function changePassword(
+  token: string | undefined,
+  currentPassword: string,
+  newPassword: string,
+  confirmation: string,
+) {
+  if (
+    newPassword.length < 16 ||
+    newPassword.length > 256 ||
+    new Set(newPassword).size < 8
+  )
+    throw new AppError(
+      400,
+      "Use 16–256 characters with at least 8 different characters. A memorable phrase works well.",
+    );
+  if (newPassword !== confirmation)
+    throw new AppError(400, "The new passwords do not match.");
+  if (currentPassword === newPassword)
+    throw new AppError(
+      400,
+      "Choose a different password from the current one.",
+    );
+  await authenticate(token);
+  await verifyCredential(currentPassword, token, newPassword);
+}
+async function verifyCredential(
+  password: string,
+  previous?: string,
+  newPassword?: string,
+) {
   const client = await db().connect();
   try {
     await client.query("begin");
     // Shared account: global DB-backed limit cannot be bypassed by forged proxy headers.
     await client.query("select pg_advisory_xact_lock(74101)");
+    if (newPassword !== undefined) await authenticate(previous, client);
     const {
       rows: [attempt],
     } = await client.query(
@@ -70,6 +103,23 @@ export async function login(password: string, previous?: string) {
     await client.query(
       "update adsn.login_control set failures=0,locked_until=null,window_started=now() where id=1",
     );
+    if (newPassword !== undefined) {
+      // Match administrator rotation lock order; wait for in-flight stock writes.
+      await client.query("select pg_advisory_xact_lock(74102)");
+      const hash = await argon2.hash(newPassword, {
+        type: argon2.argon2id,
+        memoryCost: 65536,
+        timeCost: 3,
+        parallelism: 1,
+      });
+      await client.query(
+        "update adsn.credential set password_hash=$1,rotated_at=now() where id=1",
+        [hash],
+      );
+      await client.query("delete from adsn.sessions");
+      await client.query("commit");
+      return "";
+    }
     if (previous)
       await client.query("delete from adsn.sessions where token_hash=$1", [
         digest(previous),
