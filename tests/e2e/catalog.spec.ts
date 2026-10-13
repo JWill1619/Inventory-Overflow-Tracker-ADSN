@@ -57,8 +57,8 @@ test("selects stock codes and combines official totals across pallets", async ({
   });
   await expect(product).toHaveCount(1);
   await expect(
-    product.getByText(`${initialUnits + 34} units total`, { exact: true }),
-  ).toBeVisible();
+    product.locator(".overview-product-figures dd").first(),
+  ).toHaveText(String(initialUnits + 34));
   await expect(
     product.getByText("Stock code: 00123", { exact: true }),
   ).toBeVisible();

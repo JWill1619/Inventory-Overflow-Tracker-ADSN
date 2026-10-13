@@ -11,15 +11,17 @@ export default function ShelvesView({
   disabled,
   submit,
   openPallet,
+  initialFilters,
 }: {
+  initialFilters?: { query: string; from: string; to: string };
   data: Snapshot;
   disabled: boolean;
   submit: Submit;
   openPallet: (id: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [query, setQuery] = useState(initialFilters?.query ?? "");
+  const [from, setFrom] = useState(initialFilters?.from ?? "");
+  const [to, setTo] = useState(initialFilters?.to ?? "");
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<Product>();
   const [name, setName] = useState("");

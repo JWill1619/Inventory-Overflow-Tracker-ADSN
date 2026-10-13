@@ -35,7 +35,7 @@ if (process.env.E2E_CATALOG === "true") {
   const { importCatalog } = await import("../lib/catalog-import");
   await importCatalog(
     c,
-    "stock_code,short_desc\n00123,Official shampoo 1L\n00124,Official shampoo 250ml\n",
+    "stock_code,short_desc\n00123,Official shampoo 1L\n00124,Official shampoo 250ml\n00125,Shelf only conditioner\n",
   );
   const {
     rows: [legacy],

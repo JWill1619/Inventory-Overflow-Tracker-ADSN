@@ -151,5 +151,84 @@ test("puts pallet stock and direct deliveries onto the shelf record", async ({
   await expect(
     page.getByRole("button", { name: "Record direct delivery", exact: true }),
   ).toBeEnabled();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await page.getByRole("button", { name: "All products", exact: true }).click();
+  await page.getByLabel("Search overflow").fill("00124");
+  const overviewCard = page
+    .locator(".product-card")
+    .filter({ hasText: "00124" });
+  await expect(overviewCard.locator("dd").first()).toHaveText(
+    String(priorOverflow + 4),
+  );
+  await expect(overviewCard.locator("dd").nth(1)).toHaveText(
+    String(priorShelf + 14),
+  );
+  await page.getByLabel("Shelf entries to (UTC)").fill("2020-01-01");
+  await expect(overviewCard.locator("dd").first()).toHaveText(
+    String(priorOverflow + 4),
+  );
+  await expect(overviewCard.locator("dd").nth(1)).toHaveText("0");
+  await overviewCard
+    .getByRole("button", { name: "View shelf history" })
+    .click();
+  await expect(page.getByLabel("Search stock code or product")).toHaveValue(
+    "00124",
+  );
+  await expect(page.getByLabel("To (UTC)")).toHaveValue("2020-01-01");
   expect(consoleErrors).toEqual([]);
+});
+
+test("overview finds products with only direct shelf deliveries", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Company password")
+    .fill("Browser test password only 937!");
+  await page.getByRole("button", { name: "Sign in to overflow" }).click();
+  await page.getByRole("button", { name: "Shelves", exact: true }).click();
+  await page.getByRole("button", { name: "Record direct delivery" }).click();
+  await page
+    .getByRole("combobox", { name: "Product name", exact: true })
+    .fill("00125");
+  await page
+    .getByRole("option", {
+      name: "00125 · Shelf only conditioner",
+      exact: true,
+    })
+    .click();
+  await page.getByLabel("Units put onto shelves", { exact: true }).fill("9");
+  await page
+    .getByLabel("Delivery reference or note")
+    .fill(`Shelf only ${info.project.name}`);
+  await page.getByRole("button", { name: "Review delivery" }).click();
+  await page.getByRole("button", { name: "Confirm delivery" }).click();
+  await expect(
+    page.getByText("Direct-to-shelf delivery recorded."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await page.getByRole("button", { name: "All products", exact: true }).click();
+  await page.getByLabel("Search overflow").fill("00125");
+  const card = page.locator(".product-card");
+  await expect(card).toHaveCount(1);
+  await expect(card.locator("dd").first()).toHaveText("0");
+  await expect(card.getByText("No units currently in overflow.")).toBeVisible();
+  const fresh: Snapshot = await (
+    await page.request.get("/api/inventory")
+  ).json();
+  const expected = fresh.history
+    .filter(
+      (m) => m.stockCode === "00125" && m.action_type === "SHELF_DELIVERY",
+    )
+    .reduce((n, m) => n + m.quantity, 0);
+  await expect(card.locator("dd").nth(1)).toHaveText(String(expected));
+  await page.screenshot({
+    path: info.outputPath("overview-shelves.png"),
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

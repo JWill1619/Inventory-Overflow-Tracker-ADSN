@@ -28,6 +28,7 @@ import PalletForm from "./pallet-form";
 import PalletDetail from "./pallet-detail";
 import HistoryView from "./history-view";
 import ShelvesView from "./shelves-view";
+import { shelfReport } from "@/lib/shelves";
 async function api(path: string, method = "GET", body?: unknown) {
   const r = await fetch(path, {
     method,
@@ -57,6 +58,16 @@ export default function Tracker() {
     [offline, setOffline] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [shelfFrom, setShelfFrom] = useState("");
+  const [shelfTo, setShelfTo] = useState("");
+  const [shelfFilters, setShelfFilters] = useState({
+    query: "",
+    from: "",
+    to: "",
+  });
+  const invalidShelfDates = Boolean(
+    shelfFrom && shelfTo && shelfFrom > shelfTo,
+  );
   const retry = useRef<{ serialized: string; key: string } | null>(null);
   const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
@@ -123,6 +134,7 @@ export default function Tracker() {
   }
   const navigate = (p: Page) => {
     setPage(p);
+    setShelfFilters({ query: "", from: "", to: "" });
     setSelected(null);
     setQuery("");
     setError("");
@@ -222,24 +234,15 @@ export default function Tracker() {
             ? b.created_at.localeCompare(a.created_at)
             : b.updated_at.localeCompare(a.updated_at),
     );
-  const groups = products
-    .map((p) => ({
-      ...p,
-      locations: active
-        .filter((a) => a.items.some((i) => i.productId === p.id))
-        .map((a) => ({
-          pallet: a,
-          quantity: a.items.find((i) => i.productId === p.id)!.quantity,
-        })),
-    }))
-    .filter(
-      (p) =>
-        p.locations.length &&
-        (match(p.stockCode ?? "") ||
-          match(p.name) ||
-          match(p.brand) ||
-          p.locations.some((l) => match(l.pallet.pallet_identifier))),
-    );
+  const groups = (
+    data ? shelfReport(data, "", shelfFrom, shelfTo).products : []
+  ).filter(
+    (p) =>
+      match(p.stockCode ?? "") ||
+      match(p.name) ||
+      match(p.brand) ||
+      p.locations.some((l) => match(l.name)),
+  );
   const nextName = () => {
     let n = 1;
     while (
@@ -424,6 +427,7 @@ export default function Tracker() {
             />
           ) : page === "Shelves" ? (
             <ShelvesView
+              initialFilters={shelfFilters}
               data={data!}
               disabled={busy || offline}
               submit={submit}
@@ -487,7 +491,9 @@ export default function Tracker() {
                   <div>
                     <h2>
                       {page === "Overview"
-                        ? "Your overflow stock"
+                        ? view === "products"
+                          ? "Products: overflow & shelves"
+                          : "Your overflow stock"
                         : "Pallet directory"}
                     </h2>
                     <p>A little more space. A lot more clarity.</p>
@@ -498,7 +504,9 @@ export default function Tracker() {
                     onClick={() => void exportData()}
                   >
                     <Download size={16} />
-                    Export
+                    {view === "products" && page === "Overview"
+                      ? "Export overflow"
+                      : "Export"}
                   </button>
                 </div>
                 <div className="toolbar">
@@ -550,18 +558,63 @@ export default function Tracker() {
                         </button>
                       )}
                     </label>
-                    <select
-                      aria-label="Sort pallets"
-                      value={sort}
-                      onChange={(e) => setSort(e.target.value)}
-                    >
-                      <option value="number">Pallet number</option>
-                      <option value="newest">Newest pallet</option>
-                      <option value="oldest">Oldest pallet</option>
-                      <option value="updated">Recently updated</option>
-                    </select>
+                    {!(page === "Overview" && view === "products") && (
+                      <select
+                        aria-label="Sort pallets"
+                        value={sort}
+                        onChange={(e) => setSort(e.target.value)}
+                      >
+                        <option value="number">Pallet number</option>
+                        <option value="newest">Newest pallet</option>
+                        <option value="oldest">Oldest pallet</option>
+                        <option value="updated">Recently updated</option>
+                      </select>
+                    )}
                   </div>
                 </div>
+                {page === "Overview" && view === "products" && (
+                  <div className="overview-shelf-filters">
+                    <p>
+                      Compare current overflow with units put onto shelves.
+                      Shelf figures are replenishment history; sales are not
+                      deducted, so these are not a warehouse stock total.
+                    </p>
+                    <div>
+                      <label>
+                        Shelf entries from (UTC)
+                        <input
+                          type="date"
+                          value={shelfFrom}
+                          max={shelfTo || undefined}
+                          onChange={(e) => setShelfFrom(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Shelf entries to (UTC)
+                        <input
+                          type="date"
+                          value={shelfTo}
+                          min={shelfFrom || undefined}
+                          onChange={(e) => setShelfTo(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        className="quiet"
+                        onClick={() => {
+                          setShelfFrom("");
+                          setShelfTo("");
+                        }}
+                      >
+                        All dates
+                      </button>
+                    </div>
+                    {invalidShelfDates && (
+                      <p className="error" role="alert">
+                        The end date must be on or after the start date.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="result-line">
                   <span>
                     {page === "Overview" && view === "products"
@@ -573,21 +626,23 @@ export default function Tracker() {
                     {query
                       ? ` matching “${query}”`
                       : page === "Overview"
-                        ? " in active overflow"
+                        ? view === "products"
+                          ? " with overflow or shelf records"
+                          : " in active overflow"
                         : ""}
                   </span>
                   <span>
                     <i className="tiny-dot" />
-                    Confirmed stock only
+                    {page === "Overview" && view === "products"
+                      ? "Overflow now · Shelf history"
+                      : "Confirmed stock only"}
                   </span>
                 </div>
                 {page === "Overview" && view === "products" ? (
                   <div className="product-grid">
-                    {groups.map((p) => (
+                    {(!invalidShelfDates ? groups : []).map((p) => (
                       <article className="product-card" key={p.id}>
-                        <div className="eyebrow">
-                          {p.brand || "OVERFLOW PRODUCT"}
-                        </div>
+                        <div className="eyebrow">{p.brand || "STOCK ITEM"}</div>
                         <h3>
                           {p.name}
                           {normalize(query) === normalize(p.name) && (
@@ -599,25 +654,57 @@ export default function Tracker() {
                             ? `Stock code: ${p.stockCode}`
                             : "Unlinked legacy item"}
                         </p>
-                        <strong className="product-total">
-                          {number(
-                            p.locations.reduce((s, l) => s + l.quantity, 0),
-                          )}
-                          <small> units total</small>
-                        </strong>
+                        <dl className="overview-product-figures">
+                          <div>
+                            <dt>In overflow now</dt>
+                            <dd>{number(p.overflow)}</dd>
+                            <small>Units on active pallets</small>
+                          </div>
+                          <div>
+                            <dt>Put onto shelves</dt>
+                            <dd>{number(p.fromPallets + p.direct)}</dd>
+                            <small>
+                              {shelfFrom || shelfTo
+                                ? "Selected date range"
+                                : "All recorded dates"}
+                            </small>
+                          </div>
+                        </dl>
+                        <p className="small">
+                          Shelved: {number(p.fromPallets)} from pallets ·{" "}
+                          {number(p.direct)} direct delivery
+                        </p>
+                        {!p.locations.length && (
+                          <p className="small">
+                            No units currently in overflow.
+                          </p>
+                        )}
                         {p.locations.map((l) => (
                           <button
-                            key={l.pallet.id}
-                            onClick={() => setSelected(l.pallet.id)}
+                            key={l.palletId}
+                            onClick={() => setSelected(l.palletId)}
                             className="location"
                           >
-                            {l.pallet.pallet_identifier}
+                            {l.name}
                             <span>
                               {number(l.quantity)} units{" "}
                               <ArrowUpRight size={15} />
                             </span>
                           </button>
                         ))}
+                        <button
+                          className="quiet shelf-history-link"
+                          onClick={() => {
+                            navigate("Shelves");
+                            setShelfFilters({
+                              query: p.stockCode ?? p.name,
+                              from: shelfFrom,
+                              to: shelfTo,
+                            });
+                          }}
+                        >
+                          View shelf history <ArrowUpRight size={15} />
+                        </button>
                       </article>
                     ))}
                   </div>

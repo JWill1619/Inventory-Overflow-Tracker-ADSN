@@ -1470,3 +1470,48 @@ svg {
     padding-right: 3px;
   }
 }
+
+.overview-shelf-filters {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.overview-shelf-filters > p {
+  max-width: 780px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.overview-shelf-filters > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-top: 14px;
+}
+.overview-shelf-filters label {
+  margin-bottom: 0;
+  min-width: 0;
+}
+.overview-product-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 22px 0 12px;
+}
+.overview-product-figures dt,
+.overview-product-figures small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.overview-product-figures dd {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--green);
+}
+.shelf-history-link {
+  margin-top: 12px;
+}
+@media (max-width: 760px) {
+  .overview-shelf-filters label {
+    flex: 1 1 140px;
+  }
+}
