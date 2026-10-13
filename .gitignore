@@ -8,3 +8,5 @@ playwright-report/
 .local-db/
 
 supabase/.temp/
+
+.local-data/

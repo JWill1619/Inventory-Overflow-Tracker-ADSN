@@ -205,7 +205,9 @@ export default function Tracker() {
     .filter(
       (p) =>
         match(p.pallet_identifier) ||
-        p.items.some((i) => match(i.name) || match(i.brand)),
+        p.items.some(
+          (i) => match(i.name) || match(i.brand) || match(i.stockCode ?? ""),
+        ),
     )
     .sort((a, b) =>
       sort === "number"
@@ -231,7 +233,8 @@ export default function Tracker() {
     .filter(
       (p) =>
         p.locations.length &&
-        (match(p.name) ||
+        (match(p.stockCode ?? "") ||
+          match(p.name) ||
           match(p.brand) ||
           p.locations.some((l) => match(l.pallet.pallet_identifier))),
     );
@@ -257,12 +260,13 @@ export default function Tracker() {
         s.replaceAll('"', '""') +
         '"';
       const rows = [
-        ["Pallet", "Product", "Brand", "Remaining units"],
+        ["Pallet", "Stock code", "Product", "Brand", "Remaining units"],
         ...fresh.pallets
           .filter((p) => p.status === "ACTIVE")
           .flatMap((p) =>
             p.items.map((i) => [
               p.pallet_identifier,
+              i.stockCode ?? "UNLINKED",
               i.name,
               i.brand,
               String(i.quantity),
@@ -458,6 +462,14 @@ export default function Tracker() {
                 />
               </div>
               <section className="board">
+                {products.some((p) => p.stockCode) &&
+                  active.some((p) => p.items.some((i) => !i.stockCode)) && (
+                    <div className="warning">
+                      Some existing items have no stock code. Their quantities
+                      are shown separately until their product identity is
+                      reviewed.
+                    </div>
+                  )}
                 <div className="board-top">
                   <div>
                     <h2>
@@ -512,7 +524,7 @@ export default function Tracker() {
                       <Search size={18} />
                       <input
                         aria-label="Search overflow"
-                        placeholder="Search product, brand or pallet…"
+                        placeholder="Search stock code, product or pallet…"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                       />
@@ -569,6 +581,11 @@ export default function Tracker() {
                             <span className="badge">Exact match</span>
                           )}
                         </h3>
+                        <p className="stock-code">
+                          {p.stockCode
+                            ? `Stock code: ${p.stockCode}`
+                            : "Unlinked legacy item"}
+                        </p>
                         <strong className="product-total">
                           {number(
                             p.locations.reduce((s, l) => s + l.quantity, 0),
@@ -632,6 +649,9 @@ export default function Tracker() {
                             >
                               <span>
                                 {i.name}
+                                <small className="stock-code">
+                                  {i.stockCode ?? "Unlinked legacy item"}
+                                </small>
                                 {normalize(query) === normalize(i.name) && (
                                   <small>Exact match</small>
                                 )}

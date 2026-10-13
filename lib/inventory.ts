@@ -11,15 +11,17 @@ export async function snapshot(token: string | undefined): Promise<Snapshot> {
     await authenticate(token, c);
     const pallets = (
       await c.query(
-        `select p.*,coalesce((select jsonb_agg(jsonb_build_object('productId',r.id,'name',r.name,'brand',r.brand,'quantity',i.quantity_remaining) order by r.name) from adsn.pallet_items i join adsn.products r on r.id=i.product_id where i.pallet_id=p.id and i.quantity_remaining>0),'[]') items from adsn.pallets p order by p.pallet_identifier`,
+        `select p.*,coalesce((select jsonb_agg(jsonb_build_object('productId',r.id,'name',r.name,'brand',r.brand,'stockCode',r.stock_code,'quantity',i.quantity_remaining) order by r.name) from adsn.pallet_items i join adsn.products r on r.id=i.product_id where i.pallet_id=p.id and i.quantity_remaining>0),'[]') items from adsn.pallets p order by p.pallet_identifier`,
       )
     ).rows;
     const products = (
-      await c.query("select id,name,brand from adsn.products order by name")
+      await c.query(
+        `select id,name,brand,stock_code as "stockCode" from adsn.products order by name`,
+      )
     ).rows;
     const history = (
       await c.query(
-        `select m.*,r.name product,s.pallet_identifier source,d.pallet_identifier destination from adsn.inventory_movements m left join adsn.products r on r.id=m.product_id left join adsn.pallets s on s.id=m.source_pallet_id left join adsn.pallets d on d.id=m.destination_pallet_id order by m.created_at desc,m.id`,
+        `select m.*,r.name product,r.stock_code as "stockCode",s.pallet_identifier source,d.pallet_identifier destination from adsn.inventory_movements m left join adsn.products r on r.id=m.product_id left join adsn.pallets s on s.id=m.source_pallet_id left join adsn.pallets d on d.id=m.destination_pallet_id order by m.created_at desc,m.id`,
       )
     ).rows;
     await c.query("commit");
@@ -31,11 +33,37 @@ export async function snapshot(token: string | undefined): Promise<Snapshot> {
     c.release();
   }
 }
-async function product(c: PoolClient, name: string, brand: string) {
+async function product(
+  c: PoolClient,
+  name: string,
+  brand: string,
+  productId?: string,
+) {
+  if (productId) {
+    const {
+      rows: [selected],
+    } = await c.query("select id,stock_code from adsn.products where id=$1", [
+      productId,
+    ]);
+    if (!selected)
+      throw new AppError(400, "Select a valid product from the master list.");
+    if (selected.stock_code) return selected.id as string;
+  }
+  const {
+    rows: [catalog],
+  } = await c.query(
+    "select exists(select 1 from adsn.products where stock_code is not null) enabled",
+  );
+  if (catalog.enabled)
+    throw new AppError(
+      400,
+      "Select an official stock code from the master list. Free-typed names cannot create products.",
+    );
+  if (productId) return productId;
   const {
     rows: [p],
   } = await c.query(
-    "insert into adsn.products(name,normalized_name,brand) values($1,$2,$3) on conflict(normalized_name,brand) do update set normalized_name=excluded.normalized_name returning id",
+    "insert into adsn.products(name,normalized_name,brand) values($1,$2,$3) on conflict(normalized_name,brand) where stock_code is null do update set normalized_name=excluded.normalized_name returning id",
     [name, normalize(name), normalize(brand)],
   );
   return p.id as string;
@@ -111,6 +139,17 @@ export async function mutate(
         [pallet, productId, quantity],
       );
     }
+    // Two names referring to the same directory UUID must never overwrite one another.
+    if (v.action === "create" || v.action === "draft") {
+      const resolved: string[] = [];
+      for (const line of v.lines)
+        resolved.push(await product(c, line.name, line.brand, line.productId));
+      if (new Set(resolved).size !== resolved.length)
+        throw new AppError(
+          400,
+          "This stock code appears twice. Combine its quantities into one row.",
+        );
+    }
     let id: string;
     if (v.action === "create") {
       const {
@@ -122,7 +161,7 @@ export async function mutate(
       id = p.id;
       await event("PALLET_CREATED", id);
       for (const l of v.lines) {
-        const pid = await product(c, l.name, l.brand);
+        const pid = await product(c, l.name, l.brand, l.productId);
         await set(id, pid, l.quantity);
         if (!v.draft)
           await event("STOCK_ADDED", id, pid, l.quantity, 0, l.quantity);
@@ -156,7 +195,11 @@ export async function mutate(
             id,
           ]);
           for (const l of v.lines)
-            await set(id, await product(c, l.name, l.brand), l.quantity);
+            await set(
+              id,
+              await product(c, l.name, l.brand, l.productId),
+              l.quantity,
+            );
           await event(
             "PALLET_EDITED",
             id,
@@ -172,6 +215,17 @@ export async function mutate(
             "select * from adsn.pallet_items where pallet_id=$1 and quantity_remaining>0",
             [id],
           );
+          const {
+            rows: [unlinked],
+          } = await c.query(
+            `select exists(select 1 from adsn.products where stock_code is not null) and exists(select 1 from adsn.pallet_items i join adsn.products r on r.id=i.product_id where i.pallet_id=$1 and r.stock_code is null) blocked`,
+            [id],
+          );
+          if (unlinked.blocked)
+            throw new AppError(
+              400,
+              "Select official master-list items for every draft row before activating it.",
+            );
           if (!items.length)
             throw new AppError(
               400,
@@ -213,6 +267,58 @@ export async function mutate(
             null,
             `Renamed from ${p.pallet_identifier}`.slice(0, 300),
           );
+        } else if (v.action === "link") {
+          const {
+            rows: [legacy],
+          } = await c.query(
+            "select name,stock_code from adsn.products where id=$1",
+            [v.productId],
+          );
+          const {
+            rows: [official],
+          } = await c.query(
+            "select name,stock_code from adsn.products where id=$1",
+            [v.officialProductId],
+          );
+          if (!legacy || legacy.stock_code || !official?.stock_code)
+            throw new AppError(
+              400,
+              "Choose an unlinked item and an official stock-code match.",
+            );
+          const source = await balance(id, v.productId),
+            target = await balance(id, v.officialProductId);
+          if (source <= 0)
+            throw new AppError(
+              409,
+              "This unlinked item is no longer on the pallet.",
+            );
+          await set(id, v.productId, 0);
+          await set(id, v.officialProductId, target + source);
+          const note =
+            `Identity correction: ${legacy.name} matched to ${official.stock_code} (${official.name}). No stock moved.`.slice(
+              0,
+              300,
+            );
+          await event(
+            "STOCK_ADJUSTED",
+            id,
+            v.productId,
+            -source,
+            source,
+            0,
+            null,
+            note,
+          );
+          await event(
+            "STOCK_ADJUSTED",
+            id,
+            v.officialProductId,
+            source,
+            target,
+            target + source,
+            null,
+            note,
+          );
         } else if (v.action === "transfer") {
           const {
             rows: [destination],
@@ -249,7 +355,7 @@ export async function mutate(
         } else {
           const pid =
               v.action === "add"
-                ? await product(c, v.name, v.brand)
+                ? await product(c, v.name, v.brand, v.productId)
                 : v.productId,
             before = await balance(id, pid);
           if (v.action !== "add" && before === 0)

@@ -20,9 +20,11 @@ export default function PalletDetail({
   submit: Submit;
   back: () => void;
 }) {
+  const catalog = products.some((p) => p.stockCode);
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [operationVersion, setOperationVersion] = useState(p.version);
   const [mode, setMode] = useState<
-      "take" | "add" | "correct" | "transfer" | "rename" | null
+      "take" | "add" | "correct" | "transfer" | "rename" | "link" | null
     >(null),
     [item, setItem] = useState<Item | null>(null),
     [quantity, setQuantity] = useState(""),
@@ -48,6 +50,7 @@ export default function PalletDetail({
     setQuantity("");
     setName(m === "rename" ? p.pallet_identifier : "");
     setBrand("");
+    setSelectedProduct(undefined);
     setReason("");
     setConfirm(false);
     setAmounts({});
@@ -55,7 +58,10 @@ export default function PalletDetail({
   };
   async function run(e: React.FormEvent) {
     e.preventDefault();
-    if ((mode === "correct" || mode === "transfer") && !confirm) {
+    if (
+      (mode === "correct" || mode === "transfer" || mode === "link") &&
+      !confirm
+    ) {
       setConfirm(true);
       return;
     }
@@ -65,7 +71,10 @@ export default function PalletDetail({
       version: operationVersion,
     };
     if (mode === "rename") payload.identifier = name;
-    else if (mode === "transfer") {
+    else if (mode === "link") {
+      payload.productId = item?.productId;
+      payload.officialProductId = selectedProduct?.id;
+    } else if (mode === "transfer") {
       payload.destinationId = destination;
       payload.lines = p.items
         .filter((i) => Number(amounts[i.productId]) > 0)
@@ -76,6 +85,8 @@ export default function PalletDetail({
     } else {
       payload.quantity = Number(quantity);
       if (mode === "add") {
+        if (catalog && !selectedProduct?.stockCode) return;
+        payload.productId = selectedProduct?.id;
         payload.name = name;
         payload.brand = brand;
       } else payload.productId = item?.productId;
@@ -165,11 +176,25 @@ export default function PalletDetail({
                     {i.brand || "OVERFLOW PRODUCT"}
                   </span>
                   <h3>{i.name}</h3>
+                  <p className="stock-code">
+                    {i.stockCode
+                      ? `Stock code: ${i.stockCode}`
+                      : "Unlinked legacy item"}
+                  </p>
                 </div>
                 <strong>
                   {number(i.quantity)}
                   <small> units</small>
                 </strong>
+                {catalog && !i.stockCode && (
+                  <button
+                    className="outline"
+                    disabled={disabled}
+                    onClick={() => begin("link", i)}
+                  >
+                    Match to master list
+                  </button>
+                )}
                 <button
                   className="primary"
                   disabled={disabled}
@@ -215,6 +240,7 @@ export default function PalletDetail({
                     correct: "Correct balance",
                     transfer: "Move / merge stock",
                     rename: "Edit pallet name",
+                    link: "Match to master list",
                   }[mode]
                 }
               </h2>
@@ -241,7 +267,35 @@ export default function PalletDetail({
                 units
               </p>
             )}
-            {mode === "rename" ? (
+            {mode === "link" ? (
+              <>
+                <label>
+                  Official product match
+                  <ProductInput
+                    products={products}
+                    value={name}
+                    selectedId={selectedProduct?.id}
+                    onChange={(value, _brand, product) => {
+                      setName(value);
+                      setSelectedProduct(product);
+                      setConfirm(false);
+                    }}
+                  />
+                </label>
+                <p>
+                  Check the exact item and size. Matching combines this pallet’s
+                  existing quantity with the official product and records an
+                  identity correction in history.
+                </p>
+                {confirm && (
+                  <p className="warning">
+                    Confirm matching {item?.quantity} units of “{item?.name}” to{" "}
+                    {selectedProduct?.stockCode} — {selectedProduct?.name}. The
+                    pallet’s total units will stay the same.
+                  </p>
+                )}
+              </>
+            ) : mode === "rename" ? (
               <label>
                 Pallet identifier
                 <input
@@ -288,6 +342,7 @@ export default function PalletDetail({
                 {p.items.map((i) => (
                   <label className="transfer-line" key={i.productId}>
                     {i.name}
+                    {i.stockCode ? ` · ${i.stockCode}` : " · Unlinked"}
                     <span>{i.quantity} available</span>
                     <input
                       aria-label={`Move ${i.name}`}
@@ -332,20 +387,30 @@ export default function PalletDetail({
                       <ProductInput
                         products={products}
                         value={name}
-                        onChange={(n, b) => {
+                        selectedId={selectedProduct?.id}
+                        onChange={(n, b, product) => {
+                          setSelectedProduct(product);
                           setName(n);
                           if (b !== undefined) setBrand(b);
                         }}
                       />
                     </label>
-                    <label>
-                      Brand (optional)
-                      <input
-                        value={brand}
-                        onChange={(e) => setBrand(e.target.value)}
-                        maxLength={80}
-                      />
-                    </label>
+                    {!catalog && (
+                      <label>
+                        Brand (optional)
+                        <input
+                          value={brand}
+                          onChange={(e) => setBrand(e.target.value)}
+                          maxLength={80}
+                        />
+                      </label>
+                    )}
+                    {catalog && !selectedProduct?.stockCode && (
+                      <p className="small">
+                        Select an official item from the suggestions before
+                        adding stock.
+                      </p>
+                    )}
                   </>
                 )}
                 <label>
@@ -408,6 +473,8 @@ export default function PalletDetail({
               className="primary"
               disabled={
                 disabled ||
+                (((mode === "add" && catalog) || mode === "link") &&
+                  !selectedProduct?.stockCode) ||
                 (mode === "transfer" &&
                   !Object.values(amounts).some((a) => Number(a) > 0))
               }
@@ -416,7 +483,7 @@ export default function PalletDetail({
                 ? "Saving…"
                 : confirm
                   ? "Confirm change"
-                  : mode === "transfer" || mode === "correct"
+                  : mode === "transfer" || mode === "correct" || mode === "link"
                     ? "Review change"
                     : "Confirm"}
               <Check size={18} />

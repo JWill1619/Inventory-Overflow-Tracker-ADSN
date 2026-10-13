@@ -12,10 +12,12 @@
     "test:e2e": "playwright test",
     "db:migrate": "tsx scripts/migrate.ts",
     "password:rotate": "tsx scripts/rotate-password.ts",
-    "check:bundle": "tsx scripts/check-bundle.ts"
+    "check:bundle": "tsx scripts/check-bundle.ts",
+    "products:import": "tsx scripts/import-catalog.ts"
   },
   "dependencies": {
     "argon2": "0.45.1",
+    "csv-parse": "7.0.3",
     "lucide-react": "1.56.0",
     "next": "16.4.0",
     "pg": "8.23.1",

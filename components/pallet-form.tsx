@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Plus, Trash2, Check } from "lucide-react";
 import type { Product, Pallet, Submit } from "@/lib/types";
-import { validatePalletForm } from "@/lib/pallet-form";
+import { validatePalletForm, type DraftLine } from "@/lib/pallet-form";
 import ProductInput from "./product-input";
 export default function PalletForm({
   products,
@@ -18,13 +18,16 @@ export default function PalletForm({
   pallet?: Pallet;
 }) {
   const [identifier, setIdentifier] = useState(initialName),
-    [lines, setLines] = useState(
+    [lines, setLines] = useState<DraftLine[]>(
       pallet?.items.map((i) => ({
         name: i.name,
+        productId: i.productId,
+        stockCode: i.stockCode,
         brand: i.brand,
         quantity: String(i.quantity),
       })) ?? [{ name: "", brand: "", quantity: "" }],
     );
+  const catalog = products.some((p) => p.stockCode);
   const [localError, setLocalError] = useState("");
   function update(index: number, values: Partial<(typeof lines)[number]>) {
     setLines((current) =>
@@ -34,7 +37,7 @@ export default function PalletForm({
   }
   async function save(draft: boolean) {
     setLocalError("");
-    const validated = validatePalletForm(identifier, lines);
+    const validated = validatePalletForm(identifier, lines, catalog);
     if (validated.errors.length) {
       setLocalError(validated.errors.join(" "));
       return;
@@ -81,30 +84,44 @@ export default function PalletForm({
         <div className="section-number">
           02<span>Leftover products</span>
         </div>
+        {catalog && (
+          <p className="directory-note">
+            Choose an item from the master list by stock code or description.
+            Quantities for the same code are combined across pallets.
+          </p>
+        )}
         <div className="draft-lines">
           {lines.map((l, i) => (
-            <div className="draft-line" key={i}>
+            <div
+              className={catalog ? "draft-line catalog-line" : "draft-line"}
+              key={i}
+            >
               <label>
                 Product name
                 <ProductInput
                   products={products}
                   value={l.name}
-                  onChange={(name, brand) =>
+                  selectedId={l.productId}
+                  onChange={(name, brand, product) =>
                     update(i, {
                       name,
+                      productId: product?.id,
+                      stockCode: product?.stockCode,
                       ...(brand !== undefined ? { brand } : {}),
                     })
                   }
                 />
               </label>
-              <label>
-                Brand <span className="optional">(optional)</span>
-                <input
-                  value={l.brand}
-                  maxLength={80}
-                  onChange={(e) => update(i, { brand: e.target.value })}
-                />
-              </label>
+              {!catalog && (
+                <label>
+                  Brand <span className="optional">(optional)</span>
+                  <input
+                    value={l.brand}
+                    maxLength={80}
+                    onChange={(e) => update(i, { brand: e.target.value })}
+                  />
+                </label>
+              )}
               <label>
                 Overflow units
                 <input

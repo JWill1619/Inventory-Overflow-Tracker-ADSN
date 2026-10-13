@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import EmbeddedPostgres from "embedded-postgres";
 import { Client } from "pg";
-import { readFile, mkdtemp, rm } from "node:fs/promises";
+import { readdir, readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import argon2 from "argon2";
 import { mutate, snapshot } from "../lib/inventory";
@@ -39,12 +39,13 @@ beforeAll(async () => {
   await pg.start();
   admin = pg.getPgClient();
   await admin.connect();
-  await admin.query(
-    await readFile(
-      "supabase/migrations/20261013085224_overflow_foundation.sql",
-      "utf8",
-    ),
-  );
+  for (const migration of (await readdir("supabase/migrations"))
+    .filter((n) => n.endsWith(".sql"))
+    .sort()) {
+    await admin.query(
+      await readFile(`supabase/migrations/${migration}`, "utf8"),
+    );
+  }
   await admin.query("alter role adsn_app password 'isolated-test'");
   await admin.query(
     "insert into adsn.credential(id,password_hash) values(1,$1)",
@@ -285,4 +286,139 @@ describe("real PostgreSQL security and stock transactions", () => {
       });
     await expect(login(password)).rejects.toMatchObject({ status: 429 });
   });
+});
+
+it("imports official codes without changing stock, preserves identities, and enforces selection", async () => {
+  const { importCatalog } = await import("../lib/catalog-import");
+  const before = await snapshot(token);
+  const originalUnits = before.pallets.reduce(
+    (s, p) => s + p.items.reduce((n, i) => n + i.quantity, 0),
+    0,
+  );
+  const legacyPallet = await create("Legacy matching", [7]);
+  const legacyItem = (await pallet(legacyPallet.palletId)).items[0];
+  const csv =
+    "stock_code,short_desc\n00123,Official shampoo 1L\n00124,Official shampoo 1L\n";
+  expect(await importCatalog(admin, csv)).toBe(2);
+  const imported = await snapshot(token);
+  expect(
+    imported.pallets.reduce(
+      (s, p) => s + p.items.reduce((n, i) => n + i.quantity, 0),
+      0,
+    ),
+  ).toBe(originalUnits + 7);
+  const a = imported.products.find((p) => p.stockCode === "00123")!;
+  const b = imported.products.find((p) => p.stockCode === "00124")!;
+  expect(a.id).not.toBe(b.id); // Identical descriptions are not enough to merge codes.
+  await importCatalog(admin, csv);
+  expect(
+    (await snapshot(token)).products.find((p) => p.stockCode === "00123")?.id,
+  ).toBe(a.id);
+  const first = await mutate(token, {
+    action: "create",
+    key: crypto.randomUUID(),
+    identifier: "Coded A",
+    draft: false,
+    lines: [{ productId: a.id, name: "A typed variation", quantity: 10 }],
+  });
+  const second = await mutate(token, {
+    action: "create",
+    key: crypto.randomUUID(),
+    identifier: "Coded B",
+    draft: false,
+    lines: [{ productId: a.id, name: "Another variation", quantity: 24 }],
+  });
+  expect((await pallet(first.palletId)).items[0]).toMatchObject({
+    productId: a.id,
+    name: "Official shampoo 1L",
+    stockCode: "00123",
+    quantity: 10,
+  });
+  expect((await pallet(second.palletId)).items[0].productId).toBe(a.id);
+  expect(
+    (await snapshot(token)).pallets
+      .flatMap((p) => p.items)
+      .filter((i) => i.productId === a.id)
+      .reduce((s, i) => s + i.quantity, 0),
+  ).toBe(34);
+  await expect(
+    mutate(token, {
+      action: "create",
+      key: crypto.randomUUID(),
+      identifier: "Unselected",
+      draft: false,
+      lines: [{ name: "Official shampoo 1L", quantity: 2 }],
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    mutate(token, {
+      action: "create",
+      key: crypto.randomUUID(),
+      identifier: "Forged ID",
+      draft: false,
+      lines: [
+        {
+          productId: crypto.randomUUID(),
+          name: "Official shampoo 1L",
+          quantity: 2,
+        },
+      ],
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  await expect(
+    mutate(token, {
+      action: "create",
+      key: crypto.randomUUID(),
+      identifier: "Duplicate code",
+      draft: false,
+      lines: [
+        { productId: a.id, name: "One", quantity: 2 },
+        { productId: a.id, name: "Two", quantity: 4 },
+      ],
+    }),
+  ).rejects.toThrow();
+  await expect(
+    importCatalog(
+      admin,
+      "stock_code,short_desc\n00123,Changed\n00123,Duplicate\n",
+    ),
+  ).rejects.toThrow("Duplicate stock code");
+  expect(
+    (await snapshot(token)).products.find((p) => p.id === a.id)?.name,
+  ).toBe("Official shampoo 1L");
+  await importCatalog(
+    admin,
+    "stock_code,short_desc\n00123,Official shampoo revised description\n",
+  );
+  expect((await pallet(first.palletId)).items[0]).toMatchObject({
+    productId: a.id,
+    quantity: 10,
+    name: "Official shampoo revised description",
+  });
+  const legacyBefore = await pallet(legacyPallet.palletId);
+  await mutate(token, {
+    action: "link",
+    key: crypto.randomUUID(),
+    palletId: legacyBefore.id,
+    productId: legacyItem.productId,
+    officialProductId: a.id,
+    version: legacyBefore.version,
+  });
+  expect((await pallet(legacyBefore.id)).items).toEqual([
+    expect.objectContaining({
+      productId: a.id,
+      stockCode: "00123",
+      quantity: 7,
+    }),
+  ]);
+  const linkedEvents = (await snapshot(token)).history.filter(
+    (m) =>
+      m.source === "Legacy matching" &&
+      m.notes?.startsWith("Identity correction:"),
+  );
+  expect(linkedEvents).toHaveLength(2);
+  expect(linkedEvents.reduce((sum, m) => sum + m.quantity, 0)).toBe(0);
+  expect(linkedEvents[0].movement_group_id).toBe(
+    linkedEvents[1].movement_group_id,
+  );
 });

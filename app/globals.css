@@ -1273,3 +1273,38 @@ svg {
 #operation-heading:focus {
   outline: none;
 }
+
+.stock-code {
+  color: #2d6850;
+  font-size: 12px;
+  font-weight: 600;
+}
+.selected-code {
+  display: block;
+  margin-top: 7px;
+  color: #2d6850;
+  font-size: 12px;
+  font-weight: 400;
+}
+.directory-note {
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+.catalog-line {
+  grid-template-columns: minmax(0, 3fr) minmax(100px, 1fr) 40px;
+}
+.suggestions {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.suggestions [aria-selected="true"] {
+  background: #ecf1ee;
+}
+@media (max-width: 760px) {
+  .catalog-line {
+    grid-template-columns: 1fr 40px;
+  }
+  .catalog-line > label:first-child {
+    grid-column: 1/-1;
+  }
+}

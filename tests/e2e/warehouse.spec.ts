@@ -41,7 +41,7 @@ test("warehouse worker creates, finds, replenishes, corrects and merges real sto
     .click();
   await page.getByLabel("Pallet identifier").fill(`E2E source ${suffix}`);
   await page
-    .getByRole("textbox", { name: "Product name", exact: true })
+    .getByRole("combobox", { name: "Product name", exact: true })
     .fill(`Test shampoo ${suffix}`);
   await page
     .getByRole("spinbutton", { name: "Quantity for product 1" })
@@ -78,7 +78,7 @@ test("warehouse worker creates, finds, replenishes, corrects and merges real sto
     .click();
   await page.getByLabel("Pallet identifier").fill(`E2E target ${suffix}`);
   await page
-    .getByRole("textbox", { name: "Product name", exact: true })
+    .getByRole("combobox", { name: "Product name", exact: true })
     .fill(`Test shampoo ${suffix}`);
   await page
     .getByRole("spinbutton", { name: "Quantity for product 1" })
@@ -106,7 +106,9 @@ test("warehouse worker creates, finds, replenishes, corrects and merges real sto
     page.getByText("8 units · 1 products", { exact: false }),
   ).toBeVisible();
   await page.getByRole("button", { name: "History", exact: true }).click();
-  await page.getByLabel("Product or pallet").fill(`Test shampoo ${suffix}`);
+  await page
+    .getByLabel("Stock code, product or pallet")
+    .fill(`Test shampoo ${suffix}`);
   await expect(
     page.getByRole("strong").filter({ hasText: /^stock transferred$/ }),
   ).toBeVisible();
@@ -162,10 +164,10 @@ test("draft editing, product autocomplete, added stock and second-device sync", 
     .click();
   await page.getByLabel("Pallet identifier").fill(`Draft sync ${suffix}`);
   await page
-    .getByRole("textbox", { name: "Product name", exact: true })
+    .getByRole("combobox", { name: "Product name", exact: true })
     .fill(`Test shampoo ${suffix}`);
   await page
-    .getByRole("button", { name: `Test shampoo ${suffix}`, exact: true })
+    .getByRole("option", { name: `Test shampoo ${suffix}`, exact: true })
     .click();
   await page
     .getByRole("spinbutton", { name: "Quantity for product 1" })
@@ -207,24 +209,22 @@ test("draft editing, product autocomplete, added stock and second-device sync", 
     ).toBeVisible();
     await page.getByRole("button", { name: "Add stock", exact: true }).click();
     await page
-      .getByRole("textbox", { name: "Product name", exact: true })
+      .getByRole("combobox", { name: "Product name", exact: true })
       .fill(`Test shampoo ${suffix}`);
     await page
-      .getByRole("button", { name: `Test shampoo ${suffix}`, exact: true })
+      .getByRole("option", { name: `Test shampoo ${suffix}`, exact: true })
       .click();
     await page.getByLabel("Additional units").fill("2");
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
     await expect(
       page.getByText("5 units · 1 products", { exact: false }),
     ).toBeVisible();
-    const card = second
-      .getByRole("article")
-      .filter({
-        has: second.getByRole("heading", {
-          name: `Draft sync ${suffix}`,
-          exact: true,
-        }),
-      });
+    const card = second.getByRole("article").filter({
+      has: second.getByRole("heading", {
+        name: `Draft sync ${suffix}`,
+        exact: true,
+      }),
+    });
     await expect(card.getByText("5", { exact: true })).toBeVisible({
       timeout: 10000,
     });

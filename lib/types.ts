@@ -1,5 +1,6 @@
 export type Item = {
   productId: string;
+  stockCode?: string | null;
   name: string;
   brand: string;
   quantity: number;
@@ -13,11 +14,17 @@ export type Pallet = {
   updated_at: string;
   items: Item[];
 };
-export type Product = { id: string; name: string; brand: string };
+export type Product = {
+  id: string;
+  name: string;
+  brand: string;
+  stockCode?: string | null;
+};
 export type Movement = {
   id: string;
   action_type: string;
   product: string | null;
+  stockCode?: string | null;
   source: string | null;
   destination: string | null;
   quantity: number;

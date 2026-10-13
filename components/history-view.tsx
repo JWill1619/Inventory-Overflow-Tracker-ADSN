@@ -12,7 +12,7 @@ export default function HistoryView({ data }: { data: Snapshot }) {
   const events = data.history.filter(
     (m) =>
       normalize(
-        `${m.product ?? ""} ${m.source ?? ""} ${m.destination ?? ""}`,
+        `${m.stockCode ?? ""} ${m.product ?? ""} ${m.source ?? ""} ${m.destination ?? ""}`,
       ).includes(normalize(q)) &&
       (!action || m.action_type === action) &&
       (!from || m.created_at.slice(0, 10) >= from) &&
@@ -30,7 +30,7 @@ export default function HistoryView({ data }: { data: Snapshot }) {
       <div className="form-card">
         <div className="history-filters">
           <label>
-            Product or pallet
+            Stock code, product or pallet
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -92,6 +92,7 @@ export default function HistoryView({ data }: { data: Snapshot }) {
                   {m.action_type.toLowerCase().replaceAll("_", " ")}
                 </strong>
                 <p>
+                  {m.stockCode && `${m.stockCode} · `}
                   {m.product ?? m.source}
                   {m.product && ` · ${m.source}`}
                   {m.destination && ` → ${m.destination}`}

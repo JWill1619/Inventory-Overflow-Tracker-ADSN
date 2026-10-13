@@ -9,6 +9,7 @@ const name = z
   .transform((s) => s.replace(/\s+/g, " "));
 const qty = z.number().int().min(1).max(1_000_000);
 const line = z.object({
+  productId: z.uuid().optional(),
   name,
   brand: z.string().trim().max(80).default(""),
   quantity: qty,
@@ -19,12 +20,23 @@ const lines = z
   .max(100)
   .refine(
     (v) =>
-      new Set(v.map((x) => normalize(x.name) + "|" + normalize(x.brand)))
-        .size === v.length,
+      new Set(
+        v.map(
+          (x) => x.productId ?? normalize(x.name) + "|" + normalize(x.brand),
+        ),
+      ).size === v.length,
     "Duplicate products: combine quantities into one line.",
   );
 const base = { key: z.uuid() };
 export const mutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    ...base,
+    action: z.literal("link"),
+    palletId: z.uuid(),
+    productId: z.uuid(),
+    officialProductId: z.uuid(),
+    version: z.number().int(),
+  }),
   z.object({
     ...base,
     action: z.literal("create"),
@@ -64,6 +76,7 @@ export const mutationSchema = z.discriminatedUnion("action", [
   z.object({
     ...base,
     action: z.literal("add"),
+    productId: z.uuid().optional(),
     palletId: z.uuid(),
     name,
     brand: z.string().trim().max(80).default(""),
