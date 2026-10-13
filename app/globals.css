@@ -732,10 +732,10 @@ svg {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 40px;
   gap: 12px;
-  align-items: center;
+  align-items: start;
 }
 .draft-line .icon-button {
-  margin-top: 18px;
+  margin-top: 27.5px;
   color: #93827a;
 }
 .optional {
