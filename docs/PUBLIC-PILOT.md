@@ -8,7 +8,7 @@ The owner approved Supabase Cloud in the **daiotaio labs** organization and acce
 - Render Free Node web service: the repository's `render.yaml` pins the free service plan, Frankfurt region, and current reviewed branch. Automatic deployments are off.
 - Start with the official product directory and no practice pallets, sessions, or movement history. Import from the privately held CSV after the database is provisioned; it must not enter Git or public assets.
 
-Current status: local preparation only. The Supabase connector returned `get_cost was not returned by tools/list`, so the required automated project-cost/creation flow could not run. No cloud project or web service has been created by this preparation.
+Current status: Supabase Free project `gulnvulfwbaoujkknnqg` is provisioned in daiotaio labs (Ireland, eu-west-1). All three migrations and the 788-item directory are applied; pallets and movement history started empty. Security advisors reported no findings. The restricted application role has been verified through the session pooler with TLS certificate validation. Render Free setup is in progress; no public deployment has been verified yet.
 
 ## Provision and connect
 
@@ -26,3 +26,7 @@ Current status: local preparation only. The Supabase connector returned `get_cos
 Render Free sleeps after 15 minutes without inbound traffic and may take time to wake. Supabase Free may pause projects after a low-activity period and has quota limits. Treat this as a feasibility pilot, not an uptime guarantee. Do not purchase paid upgrades without owner approval.
 
 References: [Render Free](https://render.com/docs/free), [Render Next.js](https://render.com/docs/deploy-nextjs-app), [Render Blueprint reference](https://render.com/docs/blueprint-spec), [Supabase connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
+
+## Database certificate
+
+The public Supabase root certificate in `certificates/supabase-ca.crt` was downloaded from the project dashboard’s official certificate link. `NODE_EXTRA_CA_CERTS=./certificates/supabase-ca.crt` adds this trust root while retaining certificate and hostname verification. It contains no private key or secret. Source: https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt

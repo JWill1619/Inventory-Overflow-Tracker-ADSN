@@ -13,6 +13,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_EXTRA_CA_CERTS
+        value: ./certificates/supabase-ca.crt
       - key: ACCESS_MODE
         value: public-login
       - key: DATABASE_SSL
