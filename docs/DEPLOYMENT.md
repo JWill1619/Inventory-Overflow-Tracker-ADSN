@@ -1,5 +1,7 @@
 # Private deployment, devices and recovery
 
+**Pilot update:** the owner has approved a public browser login pilot using Supabase Cloud. See [PUBLIC-PILOT.md](PUBLIC-PILOT.md) for that deployment. The private topology below remains an alternative, not the current pilot requirement.
+
 ## Preferred topology
 
 Company-approved warehouse device → Tailscale tailnet HTTPS service → loopback Next.js app → private Supabase PostgreSQL.

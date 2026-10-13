@@ -9,14 +9,19 @@ export function config() {
       APP_ORIGIN: z.url(),
       DATABASE_SSL: z.enum(["require", "disable"]).default("require"),
       PRIVATE_ACCESS_CONFIRMED: z.string().optional(),
+      ACCESS_MODE: z.enum(["private", "public-login"]).default("private"),
     })
     .parse(process.env);
   if (
     process.env.NODE_ENV === "production" &&
     (!env.APP_ORIGIN.startsWith("https://") ||
-      env.PRIVATE_ACCESS_CONFIRMED !== "true")
+      (env.ACCESS_MODE === "private" &&
+        env.PRIVATE_ACCESS_CONFIRMED !== "true") ||
+      (env.ACCESS_MODE === "public-login" && env.DATABASE_SSL !== "require"))
   )
-    throw new Error("Private HTTPS deployment must be configured.");
+    throw new Error(
+      "Configure HTTPS and the selected deployment access mode. Public-login mode requires database TLS.",
+    );
   return env;
 }
 export function db() {
