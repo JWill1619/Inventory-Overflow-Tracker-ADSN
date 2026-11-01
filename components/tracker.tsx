@@ -57,6 +57,9 @@ export default function Tracker() {
     [offline, setOffline] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  const [highlightedProduct, setHighlightedProduct] = useState<string | null>(
+    null,
+  );
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -700,7 +703,8 @@ export default function Tracker() {
                     <table className="product-table">
                       <caption>
                         Stock codes from lowest to highest. Quantities are
-                        combined across active pallets.
+                        combined across active pallets. Tap a product name to
+                        highlight its row.
                       </caption>
                       <thead>
                         <tr>
@@ -714,15 +718,35 @@ export default function Tracker() {
                       </thead>
                       <tbody>
                         {groups.map((p) => (
-                          <tr key={p.id}>
+                          <tr
+                            key={p.id}
+                            className={
+                              highlightedProduct === p.id
+                                ? "product-row-selected"
+                                : undefined
+                            }
+                          >
                             <td className="code-column">
                               {p.stockCode ?? "Unlinked"}
                             </td>
                             <th scope="row">
-                              {p.name}
-                              {p.brand && (
-                                <span className="product-brand">{p.brand}</span>
-                              )}
+                              <button
+                                type="button"
+                                className="product-row-select"
+                                aria-pressed={highlightedProduct === p.id}
+                                onClick={() =>
+                                  setHighlightedProduct((current) =>
+                                    current === p.id ? null : p.id,
+                                  )
+                                }
+                              >
+                                {p.name}
+                                {p.brand && (
+                                  <span className="product-brand">
+                                    {p.brand}
+                                  </span>
+                                )}
+                              </button>
                             </th>
                             <td className="units-column">
                               {number(

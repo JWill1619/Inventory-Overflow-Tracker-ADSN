@@ -1413,3 +1413,26 @@ svg {
     min-height: 44px;
   }
 }
+
+/* A persistent reading guide across the complete product row. */
+.product-row-select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  text-align: left;
+  font-weight: inherit;
+  border-radius: 3px;
+}
+.product-table tbody tr.product-row-selected {
+  background: var(--green);
+  color: white;
+}
+.product-row-selected .product-brand,
+.product-row-selected .product-pallet-links button,
+.product-row-selected .product-pallet-links span {
+  color: white;
+}
+.product-row-selected button:focus-visible {
+  outline-color: white;
+}
