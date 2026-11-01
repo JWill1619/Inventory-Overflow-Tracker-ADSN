@@ -182,9 +182,7 @@ export default function PalletDetail({
             {sortedItems.map((i) => (
               <article key={i.productId}>
                 <div>
-                  <span className="eyebrow">
-                    {i.brand || "OVERFLOW PRODUCT"}
-                  </span>
+                  {i.brand && <span className="eyebrow">{i.brand}</span>}
                   <h3>{i.name}</h3>
                   <p className="stock-code">
                     {i.stockCode
@@ -196,29 +194,31 @@ export default function PalletDetail({
                   {number(i.quantity)}
                   <small> units</small>
                 </strong>
-                {catalog && !i.stockCode && (
+                <div className="item-actions">
+                  {catalog && !i.stockCode && (
+                    <button
+                      className="outline"
+                      disabled={disabled}
+                      onClick={() => begin("link", i)}
+                    >
+                      Match to master list
+                    </button>
+                  )}
                   <button
-                    className="outline"
+                    className="primary"
                     disabled={disabled}
-                    onClick={() => begin("link", i)}
+                    onClick={() => begin("take", i)}
                   >
-                    Match to master list
+                    Take from overflow
                   </button>
-                )}
-                <button
-                  className="primary"
-                  disabled={disabled}
-                  onClick={() => begin("take", i)}
-                >
-                  Take from overflow
-                </button>
-                <button
-                  className="quiet"
-                  disabled={disabled}
-                  onClick={() => begin("correct", i)}
-                >
-                  Correct balance
-                </button>
+                  <button
+                    className="quiet"
+                    disabled={disabled}
+                    onClick={() => begin("correct", i)}
+                  >
+                    Correct balance
+                  </button>
+                </div>
               </article>
             ))}
             {!p.items.length && (
