@@ -21,6 +21,16 @@ export default function PalletDetail({
   back: () => void;
 }) {
   const catalog = products.some((p) => p.stockCode);
+  const sortedItems = [...p.items].sort((a, b) => {
+    if (!a.stockCode && b.stockCode) return 1;
+    if (a.stockCode && !b.stockCode) return -1;
+    return (
+      (a.stockCode ?? "").localeCompare(b.stockCode ?? "", "en-GB", {
+        numeric: true,
+        sensitivity: "base",
+      }) || a.name.localeCompare(b.name, "en-GB")
+    );
+  });
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [operationVersion, setOperationVersion] = useState(p.version);
   const [mode, setMode] = useState<
@@ -169,7 +179,7 @@ export default function PalletDetail({
             )}
           </div>
           <div className="detail-items">
-            {p.items.map((i) => (
+            {sortedItems.map((i) => (
               <article key={i.productId}>
                 <div>
                   <span className="eyebrow">
@@ -339,7 +349,7 @@ export default function PalletDetail({
                 >
                   Select all remaining stock
                 </button>
-                {p.items.map((i) => (
+                {sortedItems.map((i) => (
                   <label className="transfer-line" key={i.productId}>
                     {i.name}
                     {i.stockCode ? ` · ${i.stockCode}` : " · Unlinked"}
