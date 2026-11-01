@@ -2,7 +2,11 @@
 
 A mobile-first Next.js application for overflow stock only. The shared company login opens a master board of active pallets and products. Drafts are excluded from confirmed stock. Workers can replenish, add, correct, and consolidate stock; every confirmed stock change creates immutable history.
 
-## Current delivery status
+## Production branch
+
+`main` is the canonical branch for the live overflow tracker and all future changes. On 1 November 2026 it was advanced to the deployed stock-code sorting and compact pallet layout (commit `5a6a737`). The older `codex/shelves-trial` and `codex/pallet-stock-code-order` branches are retained for history, not as deployment targets. Render uses manual deployment; keep automatic deployments off. See [the hosting runbook](docs/PUBLIC-PILOT.md).
+
+## Original delivery status (historical)
 
 The application, migrations, real PostgreSQL integration tests, browser tests and deployment runbook are included. **No production infrastructure has been deployed or verified.** The official logo was not included with the brief: add the original image to `public/adsn-logo.webp`. Until then the interface uses plain company text, and the manifest icon cannot pass installation acceptance. No substitute logo is generated.
 
